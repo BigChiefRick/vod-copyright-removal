@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>VOD Processor Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 { 
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        h2 {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .status { 
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: white;
+        }
+        
+        .running { 
+            border-left: 4px solid #28a745;
+        }
+        
+        .error { 
+            border-left: 4px solid #dc3545;
+        }
+        
+        .upload-section {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        
+        .video-list { 
+            margin-top: 30px;
+        }
+        
+        .video-item { 
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        
+        .video-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        button { 
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .file-input-wrapper {
+            margin: 20px 0;
+        }
+        
+        input[type="file"] {
+            display: block;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        #uploadStatus {
+            margin-top: 15px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        #uploadStatus.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        #uploadStatus.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 25px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 15px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            transition: width 0.3s;
+            text-align: center;
+            line-height: 25px;
+            color: white;
+        }
+        
+        .delete-btn {
+            background-color: #dc3545;
+        }
+        
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+        
+        .method-info {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        
+        .no-videos {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .video-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .video-item > div:last-child {
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VOD Copyright Removal</h1>
+        
+        <div id="status" class="status">
+            <h2>System Status</h2>
+            <div id="statusContent">Loading...</div>
+        </div>
+        
+        <div class="upload-section">
+            <h2>Upload Video</h2>
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".mp4,.avi,.mov,.mkv,.webm">
+                <button onclick="uploadVideo()" id="uploadBtn">Upload & Process</button>
+            </div>
+            <div id="uploadStatus"></div>
+            <div class="progress" id="progressContainer" style="display: none;">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+        </div>
+        
+        <div class="video-list">
+            <h2>Processed Videos</h2>
+            <button onclick="refreshVideos()">Refresh List</button>
+            <div id="videoList"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = '/api';
+        
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_URL}/stats`);
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                const statusContent = document.getElementById('statusContent');
+                
+                statusDiv.className = 'status running';
+                
+                let methodInfo = '';
+                if (data.available_methods) {
+                    methodInfo = `<div class="method-info">Available separation methods: ${data.available_methods.join(', ')}</div>`;
+                }
+                
+                statusContent.innerHTML = `
+                    <strong>✓ System Operational</strong><br><br>
+                    CPU Usage: ${data.cpu_percent ? data.cpu_percent.toFixed(1) : 'N/A'}%<br>
+                    Memory Usage: ${data.memory_percent ? data.memory_percent.toFixed(1) : 'N/A'}%<br>
+                    Disk Usage: ${data.disk_usage ? data.disk_usage.toFixed(1) : 'N/A'}%
+                    ${methodInfo}
+                `;
+            } catch (error) {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('statusContent').innerHTML = 
+                    '<strong>✗ System Error</strong><br>' + error.message;
+            }
+        }
+        
+        async function refreshVideos() {
+            try {
+                const response = await fetch(`${API_URL}/videos`);
+                const data = await response.json();
+                const listDiv = document.getElementById('videoList');
+                
+                if (!data.videos || data.videos.length === 0) {
+                    listDiv.innerHTML = '<div class="no-videos">No processed videos yet. Upload a video to get started!</div>';
+                    return;
+                }
+                
+                listDiv.innerHTML = '';
+                data.videos.forEach(video => {
+                    const item = document.createElement('div');
+                    item.className = 'video-item';
+                    
+                    const date = new Date(video.modified);
+                    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                    
+                    item.innerHTML = `
+                        <div>
+                            <strong>${video.filename}</strong><br>
+                            Size: ${video.size_mb.toFixed(2)} MB<br>
+                            Processed: ${dateStr}
+                        </div>
+                        <div>
+                            <a href="/processed/${video.filename}" download>
+                                <button>Download</button>
+                            </a>
+                            <button class="delete-btn" onclick="deleteVideo('${video.filename}')">Delete</button>
+                        </div>
+                    `;
+                    listDiv.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error loading videos:', error);
+                document.getElementById('videoList').innerHTML = 
+                    '<div class="no-videos">Error loading videos: ' + error.message + '</div>';
+            }
+        }
+        
+        async function deleteVideo(filename) {
+            if (!confirm(`Delete ${filename}?`)) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/videos/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    refreshVideos();
+                } else {
+                    const error = await response.json();
+                    alert('Error deleting video: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting video: ' + error.message);
+            }
+        }
+        
+        async function uploadVideo() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            // Check file size (warn if > 1GB)
+            if (file.size > 1024 * 1024 * 1024) {
+                if (!confirm(`This file is ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB. Large files may take a while to upload. Continue?`)) {
+                    return;
+                }
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            const statusDiv = document.getElementById('uploadStatus');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            
+            uploadBtn.disabled = true;
+            statusDiv.textContent = 'Uploading...';
+            statusDiv.className = '';
+            progressContainer.style.display = 'block';
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        progressBar.style.width = percentComplete + '%';
+                        progressBar.textContent = percentComplete + '%';
+                    }
+                };
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const data = JSON.parse(xhr.responseText);
+                        statusDiv.textContent = `Upload complete! Processing started. File ID: ${data.file_id}`;
+                        statusDiv.className = 'success';
+                        fileInput.value = '';
+                        
+                        // Refresh video list after a delay
+                        setTimeout(() => {
+                            refreshVideos();
+                            statusDiv.textContent = '';
+                        }, 5000);
+                    } else {
+                        const error = JSON.parse(xhr.responseText);
+                        statusDiv.textContent = `Upload failed: ${error.detail || xhr.statusText}`;
+                        statusDiv.className = 'error';
+                    }
+                    uploadBtn.disabled = false;
+                    progressContainer.style.display = 'none';
+                    progressBar.style.width = '0%';
+                    progressBar.textContent = '0%';
+                };
+                
+                xhr.onerror = function() {
+                    statusDiv.textContent = 'Upload failed: Network error';
+                    statusDiv.className = 'error';
+                    uploadBtn.disabled = false;
+                    progressContainer.style.display = 'none';
+                    progressBar.style.width = '0%';
+                    progressBar.textContent = '0%';
+                };
+                
+                xhr.open('POST', `${API_URL}/upload`);
+                xhr.send(formData);
+                
+            } catch (error) {
+                statusDiv.textContent = `Upload failed: ${error.message}`;
+                statusDiv.className = 'error';
+                uploadBtn.disabled = false;
+                progressContainer.style.display = 'none';
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
+            }
+        }
+        
+        // Initialize
+        checkStatus();
+        refreshVideos();
+        
+        // Auto-refresh
+        setInterval(checkStatus, 30000);
+        setInterval(refreshVideos, 30000);
+        
+        // File input change handler
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                document.getElementById('uploadStatus').textContent = 
+                    `Selected: ${file.name} (${sizeMB} MB)`;
+                document.getElementById('uploadStatus').className = '';
+            }
+        });
+    </script>
+</body>
+</html>

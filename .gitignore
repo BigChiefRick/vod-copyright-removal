@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Logs
+*.log
+logs/
+
+# Processing directories
+incoming/
+processing/
+processed/
+downloads/
+archive/
+
+# Config with secrets
+config/secrets.yaml
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Models (downloaded on first run)
+models/
+pretrained_models/
+
+# Test videos
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+!tests/fixtures/*.mp4

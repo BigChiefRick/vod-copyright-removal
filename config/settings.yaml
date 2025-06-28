@@ -1,0 +1,26 @@
+# VOD Processor Configuration
+
+processing:
+  method: auto  # auto, demucs, or spleeter
+  max_workers: 2
+  chunk_duration: 300
+  
+audio:
+  sample_rate: 44100
+  bitrate: 192k
+  format: aac
+  
+paths:
+  incoming: /opt/vod-processor/incoming
+  processing: /opt/vod-processor/processing
+  processed: /opt/vod-processor/processed
+  archive: /opt/vod-processor/incoming/archive
+  
+system:
+  max_memory_percent: 90
+  max_disk_percent: 85
+  
+api:
+  host: 0.0.0.0
+  port: 8000
+  max_upload_size: 50G

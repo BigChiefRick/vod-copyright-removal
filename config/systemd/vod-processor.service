@@ -1,0 +1,18 @@
+[Unit]
+Description=VOD Copyright Processor
+After=network.target
+
+[Service]
+Type=simple
+User=vodprocessor
+Group=vodprocessor
+WorkingDirectory=/opt/vod-processor
+Environment="PATH=/opt/vod-processor/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/opt/vod-processor/venv/bin/python /opt/vod-processor/vod_processor.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/vod-processor/processor.log
+StandardError=append:/var/log/vod-processor/processor.error.log
+
+[Install]
+WantedBy=multi-user.target
